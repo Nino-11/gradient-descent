@@ -1,0 +1,921 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Gradient Descent Optimizers — Visual Field Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper:  #F6F1E7;
+    --paper2: #EFE8D8;
+    --ink:    #2A2620;
+    --soft:   #5A5348;
+    --faint:  #958B78;
+    --rule:   #D9CFB8;
+    --canvas-bg: #14120D;
+
+    /* optimizer palette */
+    --sgd:      #E8826B;
+    --mom:      #E4B457;
+    --rms:      #8FAA5A;
+    --adam:     #6FB3A8;
+    --sgd-dim:  rgba(232,130,107,0.18);
+    --mom-dim:  rgba(228,180,87,0.18);
+    --rms-dim:  rgba(143,170,90,0.18);
+    --adam-dim: rgba(111,179,168,0.18);
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }
+  body { font-family: 'Inter', system-ui, sans-serif; display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* ── Shell ── */
+  .shell { max-width: 1440px; margin: 0 auto; width: 100%; padding: 32px 48px 40px; display: flex; flex-direction: column; gap: 20px; flex: 1; }
+
+  /* ── Header ── */
+  .header { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; padding-bottom: 20px; border-bottom: 1px solid var(--rule); }
+  .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); margin-bottom: 10px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 44px; font-weight: 500; letter-spacing: -0.025em; margin: 0; line-height: 1; }
+  h1 em { font-style: italic; color: #B04A2F; font-weight: 400; }
+  .header-desc { max-width: 380px; font-size: 14px; line-height: 1.55; color: var(--soft); }
+
+  /* ── Controls bar ── */
+  .controls { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+  .ctrl-label { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); white-space: nowrap; }
+  .chips { display: flex; gap: 7px; flex-wrap: wrap; }
+  .chip { appearance: none; border: 1px solid var(--rule); background: var(--paper2); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 500; padding: 7px 14px; border-radius: 999px; cursor: pointer; transition: all 0.14s; }
+  .chip:hover { border-color: var(--faint); }
+  .chip.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .sep { width: 1px; height: 28px; background: var(--rule); }
+  .slider-wrap { display: flex; align-items: center; gap: 10px; }
+  .slider-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; min-width: 46px; }
+  input[type="range"] { -webkit-appearance: none; appearance: none; height: 4px; background: var(--rule); border-radius: 2px; outline: none; width: 110px; cursor: pointer; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%; background: var(--ink); border: 2px solid var(--paper); box-shadow: 0 0 0 1px var(--ink); }
+
+  /* ── Playback ── */
+  .playback { display: flex; align-items: center; gap: 10px; }
+  .btn { appearance: none; border: 1px solid var(--ink); background: var(--ink); color: var(--paper); font-family: inherit; font-size: 13px; font-weight: 600; padding: 9px 18px; border-radius: 8px; cursor: pointer; transition: all 0.13s; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(42,38,32,0.15); }
+  .btn.ghost { background: transparent; color: var(--ink); }
+  .btn.ghost:hover { background: var(--ink); color: var(--paper); }
+  .step-counter { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--faint); margin-left: 4px; }
+
+  /* ── Main layout ── */
+  .main { display: grid; grid-template-columns: 1fr 296px; gap: 18px; flex: 1; min-height: 0; }
+
+  /* ── Canvas panel ── */
+  .canvas-panel { background: var(--canvas-bg); border-radius: 18px; overflow: hidden; position: relative; display: flex; flex-direction: column; }
+  .canvas-head { padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .canvas-title { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.35); }
+  .canvas-insight { font-family: 'Fraunces', serif; font-size: 14px; font-style: italic; color: rgba(255,255,255,0.55); }
+  .canvas-wrap { position: relative; flex: 1; min-height: 0; }
+  canvas#contour { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  canvas#paths   { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+
+  /* ── Optimizer cards ── */
+  .opt-cards { display: flex; flex-direction: column; gap: 10px; }
+  .opt-card { background: var(--paper2); border: 1px solid var(--rule); border-radius: 14px; padding: 14px 16px; position: relative; overflow: hidden; transition: box-shadow 0.2s; }
+  .opt-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 2px 0 0 2px; }
+  .opt-card.sgd::before  { background: var(--sgd); }
+  .opt-card.mom::before  { background: var(--mom); }
+  .opt-card.rms::before  { background: var(--rms); }
+  .opt-card.adam::before { background: var(--adam); }
+  .opt-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .opt-name { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+  .opt-tag  { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; color: var(--faint); }
+  .opt-rule { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--soft); background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 7px 10px; margin-bottom: 9px; line-height: 1.6; }
+  .opt-rule b { color: var(--ink); }
+  .opt-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .opt-stat .sl { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--faint); }
+  .opt-stat .sv { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 500; letter-spacing: -0.015em; line-height: 1; margin-top: 2px; }
+
+  /* ── Loss chart ── */
+  .loss-panel { background: var(--canvas-bg); border-radius: 14px; overflow: hidden; }
+  .loss-head { padding: 11px 18px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between; }
+  .loss-title { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.35); }
+  .loss-legend { display: flex; gap: 16px; }
+  .loss-legend-item { display: flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: rgba(255,255,255,0.45); }
+  .loss-legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  canvas#losschart { display: block; width: 100%; height: 130px; }
+
+  /* ── Tooltip ── */
+  .tooltip { position: absolute; background: rgba(20,18,13,0.92); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 8px 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: rgba(255,255,255,0.75); pointer-events: none; z-index: 10; display: none; }
+
+  /* ── Takeaway strip ── */
+  .takeaway { padding: 18px 24px; background: var(--paper2); border: 1px solid var(--rule); border-radius: 12px; display: flex; align-items: center; gap: 18px; }
+  .takeaway-icon { font-family: 'Fraunces', serif; font-size: 28px; color: #B04A2F; flex-shrink: 0; }
+  .takeaway p { margin: 0; font-family: 'Fraunces', serif; font-size: 17px; font-weight: 400; color: var(--ink); letter-spacing: -0.005em; line-height: 1.4; }
+  .takeaway p b { font-weight: 600; font-style: italic; color: #B04A2F; }
+
+  /* tweaks panel */
+  .tweaks-panel { position: fixed; bottom: 20px; right: 20px; width: 268px; background: var(--paper); border: 1px solid var(--ink); border-radius: 14px; padding: 16px; box-shadow: 0 12px 40px rgba(42,38,32,0.2); z-index: 100; display: none; }
+  .tweaks-panel.on { display: block; }
+  .tweaks-panel h4 { font-family: 'Fraunces', serif; margin: 0 0 12px; font-size: 17px; font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
+  .tweaks-panel h4 small { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--faint); letter-spacing: 0.12em; text-transform: uppercase; }
+  .tw-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px dashed var(--rule); font-size: 12.5px; color: var(--soft); }
+  .tw-row:last-child { border-bottom: 0; }
+  .toggle { display: flex; gap: 4px; }
+  .toggle button { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 4px 9px; border: 1px solid var(--rule); background: var(--paper2); color: var(--ink); border-radius: 5px; cursor: pointer; }
+  .toggle button.on { background: var(--ink); color: var(--paper); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div>
+      <div class="eyebrow">Optimization · visual field guide · N°02</div>
+      <h1>Four ways to find the bottom<br/><em>Gradient Descent Optimizers</em></h1>
+    </div>
+    <p class="header-desc">Each optimizer has a different strategy for navigating a loss landscape. Same starting point, same goal — but they take very different paths. Pick a landscape and watch them race.</p>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <span class="ctrl-label">Landscape</span>
+    <div class="chips" id="landscape-chips">
+      <button class="chip active" data-ls="ravine">Ravine</button>
+      <button class="chip" data-ls="rosenbrock">Rosenbrock</button>
+      <button class="chip" data-ls="bowl">Bowl</button>
+      <button class="chip" data-ls="noisy">Noisy Bowl</button>
+    </div>
+    <div class="sep"></div>
+    <span class="ctrl-label">Learning rate</span>
+    <div class="slider-wrap">
+      <input type="range" id="lr-slider" min="0.3" max="3.0" step="0.1" value="1.0"/>
+      <span class="slider-val" id="lr-val">×1.0</span>
+    </div>
+    <div class="sep"></div>
+    <div class="playback">
+      <button class="btn" id="play-btn">
+        <svg width="11" height="11" viewBox="0 0 11 11"><path d="M2 1.5 L9 5.5 L2 9.5Z" fill="currentColor"/></svg>
+        Play
+      </button>
+      <button class="btn ghost" id="restart-btn">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 4a4 4 0 1 0 .4 2.5"/><path d="M10 2v2H8"/></svg>
+        Restart
+      </button>
+      <span class="ctrl-label" style="margin-left:4px;">Speed</span>
+      <div class="slider-wrap">
+        <input type="range" id="speed-slider" min="1" max="8" step="1" value="3"/>
+        <span class="slider-val" id="speed-val">×3</span>
+      </div>
+      <span class="step-counter" id="step-counter">step 0 / 300</span>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- Contour canvas -->
+    <div class="canvas-panel">
+      <div class="canvas-head">
+        <span class="canvas-title" id="canvas-title">Loss landscape · Ravine</span>
+        <span class="canvas-insight" id="canvas-insight">SGD oscillates; Adam glides straight to the bottom</span>
+      </div>
+      <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="contour"></canvas>
+        <canvas id="paths"></canvas>
+        <div class="tooltip" id="tooltip"></div>
+      </div>
+    </div>
+
+    <!-- Optimizer cards -->
+    <div class="opt-cards">
+
+      <div class="opt-card sgd">
+        <div class="opt-card-head">
+          <span class="opt-name" style="color:var(--sgd)">SGD</span>
+          <span class="opt-tag">Vanilla</span>
+        </div>
+        <div class="opt-rule">θ ← θ − <b>α·∇L</b></div>
+        <div class="opt-stats">
+          <div class="opt-stat"><div class="sl">Loss</div><div class="sv" id="sgd-loss" style="color:var(--sgd)">—</div></div>
+          <div class="opt-stat"><div class="sl">Steps</div><div class="sv" id="sgd-steps">—</div></div>
+        </div>
+      </div>
+
+      <div class="opt-card mom">
+        <div class="opt-card-head">
+          <span class="opt-name" style="color:var(--mom)">Momentum</span>
+          <span class="opt-tag">β = 0.9</span>
+        </div>
+        <div class="opt-rule">v ← <b>β·v</b> + ∇L<br/>θ ← θ − <b>α·v</b></div>
+        <div class="opt-stats">
+          <div class="opt-stat"><div class="sl">Loss</div><div class="sv" id="mom-loss" style="color:var(--mom)">—</div></div>
+          <div class="opt-stat"><div class="sl">Steps</div><div class="sv" id="mom-steps">—</div></div>
+        </div>
+      </div>
+
+      <div class="opt-card rms">
+        <div class="opt-card-head">
+          <span class="opt-name" style="color:var(--rms)">RMSProp</span>
+          <span class="opt-tag">β = 0.9</span>
+        </div>
+        <div class="opt-rule">s ← β·s + (1−β)·∇L²<br/>θ ← θ − α·∇L / <b>√s</b></div>
+        <div class="opt-stats">
+          <div class="opt-stat"><div class="sl">Loss</div><div class="sv" id="rms-loss" style="color:var(--rms)">—</div></div>
+          <div class="opt-stat"><div class="sl">Steps</div><div class="sv" id="rms-steps">—</div></div>
+        </div>
+      </div>
+
+      <div class="opt-card adam">
+        <div class="opt-card-head">
+          <span class="opt-name" style="color:var(--adam)">Adam</span>
+          <span class="opt-tag">β₁=0.9 β₂=0.999</span>
+        </div>
+        <div class="opt-rule">m ← β₁·m + (1−β₁)·∇L<br/>v ← β₂·v + (1−β₂)·∇L²<br/>θ ← θ − α·<b>m̂/√v̂</b></div>
+        <div class="opt-stats">
+          <div class="opt-stat"><div class="sl">Loss</div><div class="sv" id="adam-loss" style="color:var(--adam)">—</div></div>
+          <div class="opt-stat"><div class="sl">Steps</div><div class="sv" id="adam-steps">—</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- LOSS CHART -->
+  <div class="loss-panel">
+    <div class="loss-head">
+      <span class="loss-title">Loss over iterations (log scale)</span>
+      <div class="loss-legend">
+        <div class="loss-legend-item"><span class="loss-legend-dot" style="background:var(--sgd)"></span>SGD</div>
+        <div class="loss-legend-item"><span class="loss-legend-dot" style="background:var(--mom)"></span>Momentum</div>
+        <div class="loss-legend-item"><span class="loss-legend-dot" style="background:var(--rms)"></span>RMSProp</div>
+        <div class="loss-legend-item"><span class="loss-legend-dot" style="background:var(--adam)"></span>Adam</div>
+      </div>
+    </div>
+    <canvas id="losschart"></canvas>
+  </div>
+
+  <!-- TAKEAWAY -->
+  <div class="takeaway" id="takeaway">
+    <div class="takeaway-icon">✳</div>
+    <p id="takeaway-text">In a narrow ravine, SGD <b>bounces off the walls</b> while Adam adapts its step size per dimension — gliding straight to the minimum. Switch to Rosenbrock to see why even Adam struggles with a curved banana-shaped valley.</p>
+  </div>
+
+</div>
+
+<!-- TWEAKS -->
+<div class="tweaks-panel" id="tweaks">
+  <h4>Tweaks <small>live</small></h4>
+  <div class="tw-row">
+    <span>Trail length</span>
+    <div class="slider-wrap"><input type="range" id="tw-trail" min="10" max="120" value="60" style="width:90px"/><span class="slider-val" id="tw-trail-val">60</span></div>
+  </div>
+  <div class="tw-row">
+    <span>Point size</span>
+    <div class="slider-wrap"><input type="range" id="tw-pt" min="4" max="14" value="8" style="width:90px"/><span class="slider-val" id="tw-pt-val">8</span></div>
+  </div>
+  <div class="tw-row">
+    <span>Show gradients</span>
+    <div class="toggle">
+      <button class="on" id="tw-grad-on">On</button>
+      <button id="tw-grad-off">Off</button>
+    </div>
+  </div>
+  <div class="tw-row">
+    <span>Contour bands</span>
+    <div class="slider-wrap"><input type="range" id="tw-bands" min="4" max="20" value="10" style="width:90px"/><span class="slider-val" id="tw-bands-val">10</span></div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────
+//  TWEAKS wiring
+// ─────────────────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{"trailLen":60,"pointSize":8,"showGrad":true,"bands":10}/*EDITMODE-END*/;
+const tweaksEl = document.getElementById('tweaks');
+window.addEventListener('message', e => {
+  if (e.data?.type === '__activate_edit_mode')   tweaksEl.classList.add('on');
+  if (e.data?.type === '__deactivate_edit_mode') tweaksEl.classList.remove('on');
+});
+try { window.parent.postMessage({type:'__edit_mode_available'}, '*'); } catch(_){}
+
+// ─────────────────────────────────────────────────────────────────
+//  GLOBALS
+// ─────────────────────────────────────────────────────────────────
+const OPT_COLORS = { sgd:'#E8826B', mom:'#E4B457', rms:'#8FAA5A', adam:'#6FB3A8' };
+const OPT_KEYS   = ['sgd','mom','rms','adam'];
+const MAX_STEPS  = 300;
+
+let state = {
+  landscape: 'ravine',
+  step: 0,
+  playing: false,
+  lrMul: 1.0,
+  speed: 3,
+  trailLen: TWEAK_DEFAULTS.trailLen,
+  pointSize: TWEAK_DEFAULTS.pointSize,
+  showGrad: TWEAK_DEFAULTS.showGrad,
+  bands: TWEAK_DEFAULTS.bands,
+  paths: {},      // { sgd: [{x,y,loss}], ... }
+  rafId: null,
+  lastTs: 0,
+  heatCache: {},  // landscape → ImageData
+};
+
+// ─────────────────────────────────────────────────────────────────
+//  LOSS LANDSCAPES
+// ─────────────────────────────────────────────────────────────────
+const LANDSCAPES = {
+  ravine: {
+    name: 'Ravine',
+    insight: 'SGD bounces wildly off the steep walls; Adam adapts per-dimension and glides straight down.',
+    takeaway: 'In a <b>narrow ravine</b>, vanilla SGD bounces off the walls — large steps in the steep direction, tiny progress along the valley floor. Adam and RMSProp adapt their step size per dimension and reach the bottom in far fewer steps.',
+    fn: (x, y) => x*x + 18*y*y,
+    grad: (x, y) => [2*x, 36*y],
+    start: [2.4, 2.4],
+    min: [0, 0],
+    xRange: [-3, 3],
+    yRange: [-3, 3],
+    lrs: { sgd: 0.040, mom: 0.018, rms: 0.055, adam: 0.065 },
+  },
+  rosenbrock: {
+    name: 'Rosenbrock',
+    insight: '"The banana" — a narrow curved valley. Reaching the bottom is deceptively hard.',
+    takeaway: 'The <b>Rosenbrock banana</b> is a famous optimization test. The global minimum sits inside a long, narrow, curved valley. Getting into the valley is easy; following it to the end is hard — most optimizers overshoot.',
+    fn: (x, y) => (1-x)**2 + 100*(y - x*x)**2,
+    grad: (x, y) => [-2*(1-x) - 400*x*(y-x*x), 200*(y-x*x)],
+    start: [-1.2, 1.0],
+    min: [1, 1],
+    xRange: [-2.0, 1.8],
+    yRange: [-0.5, 2.8],
+    lrs: { sgd: 0.00085, mom: 0.00045, rms: 0.0018, adam: 0.0055 },
+  },
+  bowl: {
+    name: 'Bowl',
+    insight: 'The simplest landscape — a perfect quadratic bowl. Everyone wins, but Adam wins fastest.',
+    takeaway: 'A simple <b>quadratic bowl</b> is the best-case scenario for any optimizer. All four converge — but notice how Adam\'s bias correction gives it an aggressive early start, while SGD takes small, steady steps the whole way.',
+    fn: (x, y) => x*x + y*y,
+    grad: (x, y) => [2*x, 2*y],
+    start: [2.5, 2.2],
+    min: [0, 0],
+    xRange: [-3, 3],
+    yRange: [-3, 3],
+    lrs: { sgd: 0.12, mom: 0.055, rms: 0.09, adam: 0.12 },
+  },
+  noisy: {
+    name: 'Noisy Bowl',
+    insight: 'Sinusoidal noise creates local traps. Adaptive methods escape; SGD sometimes gets stuck.',
+    takeaway: 'Adding <b>sinusoidal noise</b> to a bowl creates hundreds of small local traps. Adaptive optimizers like Adam and RMSProp use their momentum/variance history to push through — SGD is most vulnerable to getting stuck.',
+    fn: (x, y) => x*x + y*y + 0.6*Math.sin(7*x)*Math.sin(7*y)*Math.exp(-0.25*(x*x+y*y)),
+    grad: (x, y) => {
+      const h = 1e-5;
+      const f = (a,b) => a*a + b*b + 0.6*Math.sin(7*a)*Math.sin(7*b)*Math.exp(-0.25*(a*a+b*b));
+      return [(f(x+h,y)-f(x-h,y))/(2*h), (f(x,y+h)-f(x,y-h))/(2*h)];
+    },
+    start: [2.2, 2.0],
+    min: [0, 0],
+    xRange: [-3, 3],
+    yRange: [-3, 3],
+    lrs: { sgd: 0.065, mom: 0.035, rms: 0.06, adam: 0.075 },
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────
+//  OPTIMIZERS
+// ─────────────────────────────────────────────────────────────────
+function clipGrad(g, maxNorm=50) {
+  const n = Math.sqrt(g[0]**2+g[1]**2);
+  return n>maxNorm ? [g[0]*maxNorm/n, g[1]*maxNorm/n] : g;
+}
+
+function makeSGD(lr) {
+  return { lr, step(p,g){ g=clipGrad(g); return [p[0]-this.lr*g[0], p[1]-this.lr*g[1]]; } };
+}
+function makeMomentum(lr, beta=0.9) {
+  return { lr, beta, v:[0,0], step(p,g){ g=clipGrad(g); this.v[0]=this.beta*this.v[0]+g[0]; this.v[1]=this.beta*this.v[1]+g[1]; return [p[0]-this.lr*this.v[0], p[1]-this.lr*this.v[1]]; } };
+}
+function makeRMSProp(lr, beta=0.9, eps=1e-8) {
+  return { lr, beta, eps, s:[1e-4,1e-4], step(p,g){ g=clipGrad(g); this.s[0]=this.beta*this.s[0]+(1-this.beta)*g[0]**2; this.s[1]=this.beta*this.s[1]+(1-this.beta)*g[1]**2; return [p[0]-this.lr*g[0]/(Math.sqrt(this.s[0])+this.eps), p[1]-this.lr*g[1]/(Math.sqrt(this.s[1])+this.eps)]; } };
+}
+function makeAdam(lr, b1=0.9, b2=0.999, eps=1e-8) {
+  return { lr, b1, b2, eps, m:[0,0], v:[1e-8,1e-8], t:0,
+    step(p,g){ g=clipGrad(g); this.t++; this.m[0]=this.b1*this.m[0]+(1-this.b1)*g[0]; this.m[1]=this.b1*this.m[1]+(1-this.b1)*g[1]; this.v[0]=this.b2*this.v[0]+(1-this.b2)*g[0]**2; this.v[1]=this.b2*this.v[1]+(1-this.b2)*g[1]**2; const mc=[this.m[0]/(1-this.b1**this.t), this.m[1]/(1-this.b1**this.t)]; const vc=[this.v[0]/(1-this.b2**this.t), this.v[1]/(1-this.b2**this.t)]; return [p[0]-this.lr*mc[0]/(Math.sqrt(vc[0])+this.eps), p[1]-this.lr*mc[1]/(Math.sqrt(vc[1])+this.eps)]; } };
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  PRECOMPUTE PATHS
+// ─────────────────────────────────────────────────────────────────
+function computePaths(lsKey, lrMul) {
+  const ls  = LANDSCAPES[lsKey];
+  const lrs = ls.lrs;
+  const opts = {
+    sgd:  makeSGD(lrs.sgd * lrMul),
+    mom:  makeMomentum(lrs.mom * lrMul),
+    rms:  makeRMSProp(lrs.rms * lrMul),
+    adam: makeAdam(lrs.adam * lrMul),
+  };
+  const paths = { sgd:[], mom:[], rms:[], adam:[] };
+  const pos   = { sgd:[...ls.start], mom:[...ls.start], rms:[...ls.start], adam:[...ls.start] };
+  for(const k of OPT_KEYS) {
+    paths[k].push({ x:pos[k][0], y:pos[k][1], loss:ls.fn(pos[k][0],pos[k][1]) });
+  }
+  for(let s=0;s<MAX_STEPS;s++) {
+    for(const k of OPT_KEYS) {
+      const p = pos[k];
+      const g = ls.grad(p[0], p[1]);
+      const np = opts[k].step(p, g);
+      // clamp to domain
+      np[0] = Math.max(ls.xRange[0]+0.02, Math.min(ls.xRange[1]-0.02, np[0]));
+      np[1] = Math.max(ls.yRange[0]+0.02, Math.min(ls.yRange[1]-0.02, np[1]));
+      pos[k] = np;
+      paths[k].push({ x:np[0], y:np[1], loss:ls.fn(np[0],np[1]) });
+    }
+  }
+  return paths;
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  HEATMAP (built once per landscape, cached)
+// ─────────────────────────────────────────────────────────────────
+function lerpColor(a, b, t) {
+  return [a[0]+t*(b[0]-a[0]), a[1]+t*(b[1]-a[1]), a[2]+t*(b[2]-a[2])];
+}
+const CMAP = [ // low loss → high loss
+  [240, 225, 195],  // warm cream  (0.0)
+  [190, 155,  90],  // golden      (0.25)
+  [130,  95,  42],  // dark honey  (0.50)
+  [ 68,  52,  26],  // very dark   (0.75)
+  [ 20,  18,  13],  // near black  (1.0)
+];
+function sampleCmap(t) {
+  t = Math.max(0,Math.min(1,t));
+  const seg = Math.min(CMAP.length-2, Math.floor(t*(CMAP.length-1)));
+  const lt  = t*(CMAP.length-1) - seg;
+  return lerpColor(CMAP[seg], CMAP[seg+1], lt);
+}
+
+function buildHeatmap(canvas, lsKey, bands) {
+  const ls  = LANDSCAPES[lsKey];
+  const W   = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(W, H);
+
+  // sample to find log-loss range
+  const samples = [];
+  const step = 4;
+  for(let py=0;py<H;py+=step) for(let px=0;px<W;px+=step) {
+    const x = ls.xRange[0]+(px/W)*(ls.xRange[1]-ls.xRange[0]);
+    const y = ls.yRange[0]+(py/H)*(ls.yRange[1]-ls.yRange[0]);
+    samples.push(Math.log1p(Math.abs(ls.fn(x,y))));
+  }
+  samples.sort((a,b)=>a-b);
+  const minL = samples[0];
+  const maxL = samples[Math.floor(samples.length*0.97)]; // clip top 3%
+
+  for(let py=0;py<H;py++) {
+    for(let px=0;px<W;px++) {
+      const x  = ls.xRange[0]+(px/W)*(ls.xRange[1]-ls.xRange[0]);
+      const y  = ls.yRange[0]+(py/H)*(ls.yRange[1]-ls.yRange[0]);
+      const lv = Math.log1p(Math.abs(ls.fn(x,y)));
+      let t    = Math.max(0,Math.min(1,(lv-minL)/(maxL-minL)));
+
+      // cosine contour bands
+      const band = 0.5 + 0.5*Math.cos(t * bands * Math.PI);
+      t = Math.max(0, t - band*0.04); // slight darkening at contour lines
+
+      const [r,g,b] = sampleCmap(t);
+      const i = (py*W+px)*4;
+      img.data[i]   = r;
+      img.data[i+1] = g;
+      img.data[i+2] = b;
+      img.data[i+3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+
+  // Draw minimum marker
+  const mx = worldToCanvas(ls.min[0], ls.min[1], canvas, ls);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,220,0.7)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([3,3]);
+  ctx.beginPath();
+  ctx.arc(mx.cx, mx.cy, 14, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // cross hair
+  ctx.beginPath();
+  ctx.moveTo(mx.cx-8,mx.cy); ctx.lineTo(mx.cx+8,mx.cy);
+  ctx.moveTo(mx.cx,mx.cy-8); ctx.lineTo(mx.cx,mx.cy+8);
+  ctx.stroke();
+  ctx.fillStyle='rgba(255,255,220,0.55)';
+  ctx.font="bold 10px 'JetBrains Mono', monospace";
+  ctx.fillText('MIN', mx.cx+10, mx.cy-6);
+  ctx.restore();
+
+  // START marker
+  const sp = worldToCanvas(ls.start[0], ls.start[1], canvas, ls);
+  ctx.save();
+  ctx.fillStyle='rgba(255,255,220,0.5)';
+  ctx.font="bold 10px 'JetBrains Mono', monospace";
+  ctx.fillText('START', sp.cx+10, sp.cy-6);
+  ctx.restore();
+}
+
+function worldToCanvas(x, y, canvas, ls) {
+  const W=canvas.width, H=canvas.height;
+  const cx = (x-ls.xRange[0])/(ls.xRange[1]-ls.xRange[0])*W;
+  const cy = H - (y-ls.yRange[0])/(ls.yRange[1]-ls.yRange[0])*H;
+  return {cx,cy};
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  PATH RENDERING
+// ─────────────────────────────────────────────────────────────────
+function renderPaths(step) {
+  const canvas = document.getElementById('paths');
+  const ctx    = canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  const ls     = LANDSCAPES[state.landscape];
+
+  ctx.clearRect(0,0,W,H);
+
+  for(const k of OPT_KEYS) {
+    const path  = state.paths[k];
+    const col   = OPT_COLORS[k];
+    const trailStart = Math.max(0, step - state.trailLen);
+
+    // draw trail
+    if(step >= 1) {
+      for(let s=trailStart;s<step;s++) {
+        const age = (s - trailStart) / Math.max(1, step - trailStart - 1);
+        const p0  = worldToCanvas(path[s].x,   path[s].y,   canvas, ls);
+        const p1  = worldToCanvas(path[s+1].x, path[s+1].y, canvas, ls);
+        ctx.beginPath();
+        ctx.moveTo(p0.cx, p0.cy);
+        ctx.lineTo(p1.cx, p1.cy);
+        ctx.strokeStyle = col;
+        ctx.globalAlpha = 0.15 + age * 0.75;
+        ctx.lineWidth   = 1.4 + age * 1.0;
+        ctx.lineCap     = 'round';
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // glow + current position dot
+    const cur = worldToCanvas(path[step].x, path[step].y, canvas, ls);
+    ctx.save();
+    ctx.shadowColor = col;
+    ctx.shadowBlur  = 12;
+    ctx.beginPath();
+    ctx.arc(cur.cx, cur.cy, state.pointSize, 0, Math.PI*2);
+    ctx.fillStyle = col;
+    ctx.fill();
+    ctx.restore();
+
+    // inner bright dot
+    ctx.beginPath();
+    ctx.arc(cur.cx, cur.cy, state.pointSize*0.45, 0, Math.PI*2);
+    ctx.fillStyle = '#fff';
+    ctx.globalAlpha = 0.7;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // gradient arrow
+    if(state.showGrad && step < path.length-1) {
+      const g = ls.grad(path[step].x, path[step].y);
+      const gn = Math.sqrt(g[0]**2+g[1]**2);
+      if(gn > 1e-6) {
+        const nx = g[0]/gn, ny = g[1]/gn;
+        const arrowLen = 18;
+        const ex = cur.cx + nx*arrowLen*(W/(ls.xRange[1]-ls.xRange[0]))/W*3.5;
+        const ey = cur.cy - ny*arrowLen*(H/(ls.yRange[1]-ls.yRange[0]))/H*3.5;
+        ctx.save();
+        ctx.strokeStyle = col;
+        ctx.globalAlpha = 0.45;
+        ctx.lineWidth   = 1.2;
+        ctx.setLineDash([3,3]);
+        ctx.beginPath();
+        ctx.moveTo(cur.cx, cur.cy);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+    }
+  }
+
+  // start dot
+  const sp = worldToCanvas(ls.start[0], ls.start[1], document.getElementById('paths'), ls);
+  ctx.beginPath();
+  ctx.arc(sp.cx, sp.cy, 5, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,220,0.55)';
+  ctx.fill();
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  LOSS CHART
+// ─────────────────────────────────────────────────────────────────
+function renderLossChart(step) {
+  const canvas = document.getElementById('losschart');
+  const ctx    = canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#14120D';
+  ctx.fillRect(0,0,W,H);
+
+  // find global log-loss range across all paths
+  let minLL=Infinity, maxLL=-Infinity;
+  for(const k of OPT_KEYS) {
+    for(let s=0;s<=step;s++) {
+      const ll = Math.log1p(Math.max(0, state.paths[k][s].loss));
+      if(ll<minLL) minLL=ll;
+      if(ll>maxLL) maxLL=ll;
+    }
+  }
+  if(maxLL===minLL) maxLL=minLL+1;
+
+  const PAD = { t:14, r:18, b:20, l:48 };
+  const cw   = W - PAD.l - PAD.r;
+  const ch   = H - PAD.t - PAD.b;
+
+  // grid
+  ctx.strokeStyle='rgba(255,255,255,0.06)';
+  ctx.lineWidth=1;
+  for(let i=0;i<=4;i++) {
+    const y = PAD.t + ch*(i/4);
+    ctx.beginPath(); ctx.moveTo(PAD.l,y); ctx.lineTo(PAD.l+cw,y); ctx.stroke();
+    // y label
+    const lv = minLL + (maxLL-minLL)*(1-i/4);
+    ctx.fillStyle='rgba(255,255,255,0.22)';
+    ctx.font="9px 'JetBrains Mono',monospace";
+    ctx.textAlign='right';
+    ctx.fillText(lv.toFixed(1), PAD.l-5, y+3);
+  }
+  ctx.textAlign='left';
+
+  // lines
+  for(const k of OPT_KEYS) {
+    const col = OPT_COLORS[k];
+    ctx.beginPath();
+    for(let s=0;s<=step;s++) {
+      const ll = Math.log1p(Math.max(0, state.paths[k][s].loss));
+      const x  = PAD.l + (s/MAX_STEPS)*cw;
+      const y  = PAD.t + ch*(1-(ll-minLL)/(maxLL-minLL));
+      s===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.strokeStyle = col;
+    ctx.lineWidth   = 2;
+    ctx.globalAlpha = 0.9;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // current step line
+  const sx = PAD.l + (step/MAX_STEPS)*cw;
+  ctx.beginPath();
+  ctx.moveTo(sx, PAD.t);
+  ctx.lineTo(sx, PAD.t+ch);
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth   = 1;
+  ctx.setLineDash([4,4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // x axis label
+  ctx.fillStyle = 'rgba(255,255,255,0.2)';
+  ctx.font = "9px 'JetBrains Mono',monospace";
+  ctx.fillText('0', PAD.l, H-4);
+  ctx.fillText(MAX_STEPS, PAD.l+cw-16, H-4);
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  UPDATE CARDS
+// ─────────────────────────────────────────────────────────────────
+function fmt(v) {
+  if(v<0.01) return v.toExponential(2);
+  if(v<1000) return v.toFixed(3);
+  return v.toExponential(2);
+}
+function updateCards(step) {
+  for(const k of OPT_KEYS) {
+    const p = state.paths[k][step];
+    const el_loss  = document.getElementById(`${k}-loss`);
+    const el_steps = document.getElementById(`${k}-steps`);
+    if(el_loss)  el_loss.textContent  = fmt(p.loss);
+    if(el_steps) el_steps.textContent = step;
+  }
+  document.getElementById('step-counter').textContent = `step ${step} / ${MAX_STEPS}`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  CANVAS SIZING
+// ─────────────────────────────────────────────────────────────────
+function resizeCanvases() {
+  const wrap   = document.getElementById('canvas-wrap');
+  const W      = wrap.clientWidth;
+  const H      = wrap.clientHeight;
+  for(const id of ['contour','paths']) {
+    const c = document.getElementById(id);
+    if(c.width!==W||c.height!==H) {
+      c.width=W; c.height=H;
+    }
+  }
+  const lc = document.getElementById('losschart');
+  lc.width  = lc.clientWidth  * devicePixelRatio || lc.clientWidth;
+  lc.height = lc.clientHeight * devicePixelRatio || lc.clientHeight;
+  // scale context for HiDPI
+  const lctx = lc.getContext('2d');
+  const dpr  = devicePixelRatio || 1;
+  lc.width   = lc.clientWidth  * dpr;
+  lc.height  = lc.clientHeight * dpr;
+  lctx.scale(dpr, dpr);
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  DRAW EVERYTHING
+// ─────────────────────────────────────────────────────────────────
+function drawAll(step) {
+  const cc = document.getElementById('contour');
+  const ls = state.landscape;
+  const cacheKey = `${ls}_${state.bands}`;
+  if(!state.heatCache[cacheKey]) {
+    buildHeatmap(cc, ls, state.bands);
+    // cache the imagedata
+    const ctx = cc.getContext('2d');
+    state.heatCache[cacheKey] = ctx.getImageData(0,0,cc.width,cc.height);
+  } else {
+    const ctx = cc.getContext('2d');
+    ctx.putImageData(state.heatCache[cacheKey], 0, 0);
+  }
+  renderPaths(step);
+  renderLossChart(step);
+  updateCards(step);
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  ANIMATION LOOP
+// ─────────────────────────────────────────────────────────────────
+let subStep = 0;
+
+function tick(ts) {
+  if(!state.playing) return;
+  const elapsed = ts - state.lastTs;
+  if(elapsed > 1000/60) {
+    state.lastTs = ts;
+    subStep += state.speed;
+    while(subStep >= 1) {
+      subStep -= 1;
+      if(state.step < MAX_STEPS) {
+        state.step++;
+        drawAll(state.step);
+      } else {
+        state.playing = false;
+        document.getElementById('play-btn').innerHTML = `<svg width="11" height="11" viewBox="0 0 11 11"><path d="M2 1.5 L9 5.5 L2 9.5Z" fill="currentColor"/></svg>Play`;
+        return;
+      }
+    }
+  }
+  state.rafId = requestAnimationFrame(tick);
+}
+
+function startPlay() {
+  if(state.step>=MAX_STEPS) resetState();
+  state.playing = true;
+  state.lastTs  = performance.now();
+  state.rafId   = requestAnimationFrame(tick);
+  document.getElementById('play-btn').innerHTML = `<svg width="11" height="11" viewBox="0 0 11 11"><rect x="1.5" y="1.5" width="3" height="8" rx="1" fill="currentColor"/><rect x="6.5" y="1.5" width="3" height="8" rx="1" fill="currentColor"/></svg>Pause`;
+}
+
+function pausePlay() {
+  state.playing = false;
+  if(state.rafId) cancelAnimationFrame(state.rafId);
+  document.getElementById('play-btn').innerHTML = `<svg width="11" height="11" viewBox="0 0 11 11"><path d="M2 1.5 L9 5.5 L2 9.5Z" fill="currentColor"/></svg>Play`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  STATE INIT / RESET
+// ─────────────────────────────────────────────────────────────────
+function resetState() {
+  pausePlay();
+  state.step    = 0;
+  subStep       = 0;
+  state.paths   = computePaths(state.landscape, state.lrMul);
+  // invalidate heatmap cache on landscape change
+  const ls = LANDSCAPES[state.landscape];
+  document.getElementById('canvas-title').textContent  = `Loss landscape · ${ls.name}`;
+  document.getElementById('canvas-insight').textContent = ls.insight;
+  document.getElementById('takeaway-text').innerHTML   = ls.takeaway;
+  drawAll(0);
+}
+
+function switchLandscape(lsKey) {
+  state.landscape = lsKey;
+  state.heatCache = {};
+  // Resize / rebuild
+  resizeCanvases();
+  resetState();
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  UI WIRING
+// ─────────────────────────────────────────────────────────────────
+// Landscape chips
+document.getElementById('landscape-chips').addEventListener('click', e => {
+  const b = e.target.closest('.chip');
+  if(!b) return;
+  document.querySelectorAll('#landscape-chips .chip').forEach(c=>c.classList.toggle('active',c===b));
+  switchLandscape(b.dataset.ls);
+});
+
+// Play/Pause
+document.getElementById('play-btn').addEventListener('click', () => {
+  state.playing ? pausePlay() : startPlay();
+});
+
+// Restart
+document.getElementById('restart-btn').addEventListener('click', () => {
+  resetState();
+});
+
+// LR slider
+const lrSlider = document.getElementById('lr-slider');
+const lrVal    = document.getElementById('lr-val');
+lrSlider.addEventListener('input', () => {
+  state.lrMul = +lrSlider.value;
+  lrVal.textContent = `×${state.lrMul.toFixed(1)}`;
+  state.heatCache = {};
+  resetState();
+});
+
+// Speed slider
+const spSlider = document.getElementById('speed-slider');
+const spVal    = document.getElementById('speed-val');
+spSlider.addEventListener('input', () => {
+  state.speed = +spSlider.value;
+  spVal.textContent = `×${state.speed}`;
+});
+
+// Tweaks
+document.getElementById('tw-trail').addEventListener('input', e => {
+  state.trailLen = +e.target.value;
+  document.getElementById('tw-trail-val').textContent = state.trailLen;
+  if(!state.playing) drawAll(state.step);
+});
+document.getElementById('tw-pt').addEventListener('input', e => {
+  state.pointSize = +e.target.value;
+  document.getElementById('tw-pt-val').textContent = state.pointSize;
+  if(!state.playing) drawAll(state.step);
+});
+document.getElementById('tw-bands').addEventListener('input', e => {
+  state.bands = +e.target.value;
+  document.getElementById('tw-bands-val').textContent = state.bands;
+  state.heatCache = {};
+  if(!state.playing) { buildHeatmap(document.getElementById('contour'), state.landscape, state.bands); renderPaths(state.step); }
+});
+['tw-grad-on','tw-grad-off'].forEach(id => {
+  document.getElementById(id).addEventListener('click', () => {
+    state.showGrad = id === 'tw-grad-on';
+    document.getElementById('tw-grad-on').classList.toggle('on', state.showGrad);
+    document.getElementById('tw-grad-off').classList.toggle('on', !state.showGrad);
+    if(!state.playing) drawAll(state.step);
+  });
+});
+
+// Mouse hover tooltip on canvas
+document.getElementById('canvas-wrap').addEventListener('mousemove', e => {
+  const wrap = document.getElementById('canvas-wrap');
+  const rect  = wrap.getBoundingClientRect();
+  const mx    = e.clientX - rect.left;
+  const my    = e.clientY - rect.top;
+  const ls    = LANDSCAPES[state.landscape];
+  const W     = wrap.clientWidth, H=wrap.clientHeight;
+  const wx    = ls.xRange[0]+(mx/W)*(ls.xRange[1]-ls.xRange[0]);
+  const wy    = ls.yRange[0]+((H-my)/H)*(ls.yRange[1]-ls.yRange[0]);
+  const loss  = ls.fn(wx,wy);
+  const tt    = document.getElementById('tooltip');
+  tt.style.display = 'block';
+  tt.style.left    = (mx+14)+'px';
+  tt.style.top     = (my-8)+'px';
+  tt.textContent   = `(${wx.toFixed(2)}, ${wy.toFixed(2)}) → loss: ${loss.toFixed(3)}`;
+});
+document.getElementById('canvas-wrap').addEventListener('mouseleave', () => {
+  document.getElementById('tooltip').style.display='none';
+});
+
+// ─────────────────────────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────────────────────────
+function init() {
+  resizeCanvases();
+  state.paths = computePaths(state.landscape, state.lrMul);
+  drawAll(0);
+}
+
+window.addEventListener('resize', () => {
+  state.heatCache = {};
+  resizeCanvases();
+  drawAll(state.step);
+});
+
+init();
+</script>
+</body>
+</html>
