@@ -1,4 +1,4 @@
-## Live Demo  
+## Interactive Demo  
 **[Try it here](https://nino-11.github.io/gradient-descent/)**
 
 An interactive visualization that builds intuition for how different gradient descent optimizers behave on complex loss landscapes.
